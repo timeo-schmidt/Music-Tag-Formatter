@@ -12,11 +12,11 @@
 
 #include <fstream>
 #include <iostream>
-#include <filesystem>
+#include <experimental/filesystem>
 #include <cstdlib>
 
 using namespace std;
-// namespace fs = std::filesystem;
+namespace fs = experimental::filesystem;
 
 // Program takes in root path for operation as command line argument
 int main(int argc, char** argv)
@@ -31,36 +31,48 @@ int main(int argc, char** argv)
 
 
     // Iterating through directory recursively and adding all the file paths
-    for(auto& p: filesystem::recursive_directory_iterator(argv[1]))
+    for(auto& p: fs::recursive_directory_iterator(argv[1]))
     {
-        all_files.push_back({p.filename(), p.relative_path()})
-        cout << p.path().filename() << '\n';
+        string file_name_substr, file_path_substr;
+        string current_element = p.path().string();
+        file_name_substr = current_element.substr(current_element.find_last_of("/")+1);
+
+        int ending_sequence_pos = file_name_substr.find("my-free-mp3s.com");
+        if(ending_sequence_pos  != string::npos)
+        {
+          // cout << "file_name_substr: " << file_name_substr.substr(0, ending_sequence_pos) << endl;
+          all_files.push_back({file_name_substr, p.path().string()});
+        }
     }
+
 
     for(auto const& f: all_files)
     {
 
         // Re-Format File, if file contains "my-free-mp3s.com".
-        int ending_sequence_pos = f.file_name.find("my-free-mp3s.com");
-        if(ending_sequence != string::npos)
-        {
-            string artist_name, track_title;
-            int separator_sequence_pos = f.file_name.find(" - ");
-            artist_name = f.file_name.substr(0, separator_sequence_pos);
-            track_title = f.file_name.substr(separator_sequence_pos+3, ending_sequence_pos);
+        string artist_name, track_title;
+        int separator_sequence_pos = f.file_name.find(" - ");
+        int ending_sequence_pos1 = f.file_name.find("my-free-mp3s.com");
 
-            // Execute id3tool to modify MP3s meta data
-            system("id3tool --set-title=\"" + track_title + "\" --set-artist=\"" + artist_name + "\" " f.full_path);
+        artist_name = f.file_name.substr(0, separator_sequence_pos);
+        track_title = f.file_name.substr(separator_sequence_pos+3, ending_sequence_pos1-(separator_sequence_pos+3));
 
-            // Change File Name. Find Occurence of File Name in Path. Change
-            int file_name_in_path_pos = f.full_path.find(f.file_name);
-            string new_file_name = f.file_name.substr(0, ending_sequence_pos) + ".mp3";
-            // Renaming file
-            system("mv " + f.full_path + " " + f.full_path.substr(0,file_name_in_path_pos) + new_file_name);
+        // // Execute id3tool to modify MP3s meta data
+        string cmd_tag_edit = "id3tool --set-title=\"" + track_title + "\" --set-artist=\"" + artist_name + "\" " + "\"" + f.full_path + "\"";
+        system(cmd_tag_edit.c_str());
 
-        }
+        // // Change File Name. Find Occurence of File Name in Path. Change
+        int file_name_in_path_pos = f.full_path.find(f.file_name);
+        string new_file_name = f.file_name.substr(0, ending_sequence_pos1) + ".mp3";
+        // Renaming file
+        string cmd_rename_file = "mv \"" + f.full_path + "\" \"" + f.full_path.substr(0,file_name_in_path_pos) + new_file_name + "\"";
+        system(cmd_rename_file.c_str());
 
+        cout << "Modified Track: " + new_file_name << endl;
     }
+
+    cout << endl << endl << "Successfully Modified " + to_string(all_files.size()) + " tracks." << endl;
+    return 0;
 
 }
 
